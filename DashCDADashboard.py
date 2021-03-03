@@ -30,19 +30,22 @@ def checklistData(projectlist):
 def getProjectCounts(projectlist):
     #TODO figure out next page functions
     finaldata = {}
+    limit = 1000
     for project in projectlist:
         query = Q('ResearchSubject.Specimen.associated_project = ' + '"' + project + '"')
-        result = query.run()
-
-        for subject in result:
-            cathash = {}
-            for specimen in subject['Specimen']:
-                for file in specimen['File']:
-                    if file['data_category'] in cathash:
-                        cathash[file['data_category']] = cathash[file['data_category']] + 1
-                    else:
-                        cathash[file['data_category']] = 1
-            finaldata[project] = cathash
+        result = query.run(limit = limit)
+        while result.count >= limit:
+            for subject in result:
+                cathash = {}
+                for specimen in subject['Specimen']:
+                    for file in specimen['File']:
+                        if file['data_category'] in cathash:
+                            cathash[file['data_category']] = cathash[file['data_category']] + 1
+                        else:
+                            cathash[file['data_category']] = 1
+                finaldata[project] = cathash
+            print("Requesting next page")
+            result = result.next_page()
     return finaldata       
 
 
