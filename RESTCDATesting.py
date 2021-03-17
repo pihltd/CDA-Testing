@@ -11,8 +11,13 @@ def getProjects(testmode, verbose):
     else:
         projectlist = unique_terms("ResearchSubject.associated_project")
     return projectlist
-def runQuery(querystring, verbose):
-    cdaURL = 'https://cda.cda-dev.broadinstitute.org/api/v1/sql-query/v3'
+
+def runQuery(querystring, limit, verbose):
+    #Using a limit:
+    if limit is not None:
+        cdaURL = "https://cda.cda-dev.broadinstitute.org/api/v1/sql-query/v3?limit={}".format(str(limit))
+    else:
+        cdaURL = 'https://cda.cda-dev.broadinstitute.org/api/v1/sql-query/v3'
     headers = {'accept' : 'application/json', 'Content-Type' : 'text/plain'}
 
     request = requests.post(cdaURL, headers = headers, data = querystring)
@@ -49,15 +54,14 @@ def parseSamplePerDataCategory(results, verbose):
 def main(args):
     countdata = {}
     projectlist = getProjects(args.testmode, args.verbose)
+    if args.testmode:
+        limit = None
+    else:
+        limit = 50000
     
     for project in projectlist:
-        #querystring = countQuery(project)
-        #pprint.pprint(querystring)
-        #result = runQuery(querystring, args.verbose)
-        #pprint.pprint(result)
-
         querystring = samplePerDataCategory(project)
-        result = runQuery(querystring, args.verbose)
+        result = runQuery(querystring, limit, args.verbose)
         if args.verbose:
             pprint.pprint(result)
         finaldata = parseSamplePerDataCategory(result, args.verbose)
