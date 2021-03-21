@@ -5,7 +5,8 @@ import dash
 import dash_bootstrap_components as dbc 
 import dash_html_components as html
 import dash_core_components as dcc
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
+import plotly.graph_objects as go
 import pprint
 import requests
 
@@ -22,11 +23,12 @@ def runAPIQuery(querystring, limit):
     if request.status_code == 200:
         return request.json()
     else:
-        raise Exception ("Query failed code {}. {}".format(request.status_code,query))
+        raise Exception ("Query failed code {}. {}".format(request.status_code,querystring))
 
 def getDataCategories(testmode):
     if testmode:
-        datacatlist = ["Biospecimen", "DNA Methylation"]
+        datacatlist = ["Biospecimen", "DNA Methylation", "Raw Mass Spectra"]
+        #datacatlist = ["Raw Mass Spectra"]
     else:
         datacatlist = unique_terms("ResearchSubject.Specimen.File.data_category")
     return datacatlist
@@ -63,14 +65,34 @@ def nodeParsedQuery(jsondata):
     for result in jsondata['result']:
         if result['SYS'] not in workingdata.keys():
             workingdata[result['SYS']] = [{result['FDC']: result['RID']}]
-        elif {result['FDC']: result['RID']} not in workingdata['SYS']:
-            workingdata['SYS'].append({result['FDC']: result['RID']})
-    
+        elif {result['FDC']: result['RID']} not in workingdata[result['SYS']]:
+            workingdata[result['SYS']].append({result['FDC']: result['RID']}) 
+
     for repo, catlist in workingdata.items():
         temphash = {}
-        for datacat, rsid in catlist.items():
-            if datacat in temphash.keys():
-                temphash[datacat].append(rsid)
+        for item in catlist:
+            for datacat, rsid in item.items():
+                if datacat in temphash.keys():
+                    temphash[datacat].append(rsid)
+                else:
+                    temphash[datacat] = [rsid]
+            finaldata[repo] = temphash
+    return finaldata
+
+def plotlyBarChart(graphdata):
+    data = []
+    for repo, dataarray in graphdata.items():
+        catlist = []
+        countlist = []
+        for datacat, rsid in dataarray.items():
+            catlist.append(datacat)
+            countlist.append(len(rsid))
+        data.append({'x': catlist, 'y': countlist, 'type': 'bar', 'name': repo})
+    pprint.pprint(data)
+    fig = {
+        'data' : data, 'layout' : {'title': 'Case Counts by Repository'}
+    }
+    return fig
 
 
 ########################
@@ -78,16 +100,18 @@ def nodeParsedQuery(jsondata):
 ########################
 
 # Get the datacategories
-datacatlist = getDataCategories(True)
+datacatlist = getDataCategories(False)
 datacatchecklist = checklistData(datacatlist)
 #baseq = buildDataCategoryQuery(datacatlist)
 #pprint.pprint(baseq)
-#result = runAPIQuery(baseq, 10)
+#result = runAPIQuery(baseq, 1000)
 #pprint.pprint(result)
+#graphdata = nodeParsedQuery(result)
+#fig = plotlyBarChart(graphdata)
 
 #Initialize the program
-dashboard = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
-#dashboard = dash.Dash(external_stylesheets=['https://codepen.io/chriddyp/bWLwgP.css'])
+#dashboard = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
+dashboard = dash.Dash(external_stylesheets=['https://codepen.io/chriddyp/bWLwgP.css'])
 
 
 # HTML Layout Section
@@ -110,7 +134,8 @@ dashboard.layout = html.Div(
                 dbc.Col(
                     children = [
                         html.Span("Cases in each selected Data Category"),
-                        html.Div(id="graphcontainer")
+                        html.Div(id="graphcontainer"),
+                        #xdcc.Graph(id="catbarchart", figure = fig)
                     ], width = 3
                 )
             ]
@@ -123,6 +148,24 @@ dashboard.layout = html.Div(
         )
     ]
 )
+
+#################
+#   Callbacks   #
+#################
+
+@dashboard.callback(
+    Output(component_id = 'graphcontainer', component_property = 'children'),
+    [Input(component_id = 'graphUpdateButton', component_property= 'n_clicks')],
+    [State(component_id='datacatchecklist', component_property='value')]
+)
+def updateGraph(n_clicks, datacatchecklist):
+    if datacatchecklist is not None:
+        pprint.pprint(datacatchecklist)
+        query = buildDataCategoryQuery(datacatchecklist)
+        result = runAPIQuery(query, 1000)
+        graphdata = nodeParsedQuery(result)
+        fig = plotlyBarChart(graphdata)
+        return dcc.Graph(id='barchart', figure = fig)
 
 
 if __name__ == "__main__":
