@@ -44,11 +44,6 @@ def checklistData(projectlist):
     return checklistdata
 
 def buildDataCategoryQuery(catlist):
- #   baseq = (
- #       'SELECT _ResearchSubject.id as RID, _ResearchSubject.associated_project AS RPR, _File.data_category AS FDC, '
- #       '_identifier.system AS SYS FROM gdc-bq-sample.cda_mvp.v3, UNNEST(ResearchSubject) AS _ResearchSubject, UNNEST(_ResearchSubject.Specimen) AS _Specimen, '
- #       'UNNEST(_Specimen.File) AS _File, UNNEST(_ResearchSubject.identifier) AS _identifier WHERE'
- #   )
     baseq = (
         'SELECT COUNT(DISTINCT _ResearchSubject.id) as idcount,  _File.data_category as datacat, _identifier.system AS repo FROM gdc-bq-sample.cda_mvp.v3, '
         'UNNEST(ResearchSubject) AS _ResearchSubject, UNNEST(_ResearchSubject.Specimen) AS _Specimen, UNNEST(_Specimen.File) AS _File, '
@@ -99,12 +94,7 @@ def plotlyBarChart(graphdata):
 # Get the datacategories
 datacatlist = getDataCategories(False)
 datacatchecklist = checklistData(datacatlist)
-#baseq = buildDataCategoryQuery(datacatlist)
-#pprint.pprint(baseq)
-#result = runAPIQuery(baseq, 1000)
-#pprint.pprint(result)
-#graphdata = nodeParsedQuery(result)
-#fig = plotlyBarChart(graphdata)
+
 
 #Initialize the program
 #dashboard = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
