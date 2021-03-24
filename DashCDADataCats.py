@@ -44,39 +44,36 @@ def checklistData(projectlist):
     return checklistdata
 
 def buildDataCategoryQuery(catlist):
-    baseq = 'SELECT _ResearchSubject.id as RID, _ResearchSubject.associated_project AS RPR, _File.data_category AS FDC, _identifier.system AS SYS FROM gdc-bq-sample.cda_mvp.v3, UNNEST(ResearchSubject) AS _ResearchSubject, UNNEST(_ResearchSubject.Specimen) AS _Specimen, UNNEST(_Specimen.File) AS _File, UNNEST(_ResearchSubject.identifier) AS _identifier WHERE'
+ #   baseq = (
+ #       'SELECT _ResearchSubject.id as RID, _ResearchSubject.associated_project AS RPR, _File.data_category AS FDC, '
+ #       '_identifier.system AS SYS FROM gdc-bq-sample.cda_mvp.v3, UNNEST(ResearchSubject) AS _ResearchSubject, UNNEST(_ResearchSubject.Specimen) AS _Specimen, '
+ #       'UNNEST(_Specimen.File) AS _File, UNNEST(_ResearchSubject.identifier) AS _identifier WHERE'
+ #   )
+    baseq = (
+        'SELECT COUNT(DISTINCT _ResearchSubject.id) as idcount,  _File.data_category as datacat, _identifier.system AS repo FROM gdc-bq-sample.cda_mvp.v3, '
+        'UNNEST(ResearchSubject) AS _ResearchSubject, UNNEST(_ResearchSubject.Specimen) AS _Specimen, UNNEST(_Specimen.File) AS _File, '
+        'UNNEST(_ResearchSubject.identifier) AS _identifier WHERE '
+    )
     counter = 1
     for category in catlist:
         if counter > 1:
             baseq = baseq + ' OR '
-        baseq = baseq + ' _File.data_category = "{}"'.format(category)
+        baseq = baseq + '( _File.data_category = "{}" )'.format(category)
         counter += 1
+    
+    baseq = baseq + ' GROUP BY _File.data_category,  _identifier.system'
     return baseq
 
 def nodeParsedQuery(jsondata):
     finaldata = {}
     workingdata = {}
-    #Will return{system:{data category: [case id]}}
-    # FDC = File Data Category
-    # RID = ResearchSubject ID
-    # RPR - Research project
-    # SYS - Repository
-
+    #will return {system:[{data category: case count}]}
+      
     for result in jsondata['result']:
-        if result['SYS'] not in workingdata.keys():
-            workingdata[result['SYS']] = [{result['FDC']: result['RID']}]
-        elif {result['FDC']: result['RID']} not in workingdata[result['SYS']]:
-            workingdata[result['SYS']].append({result['FDC']: result['RID']}) 
-
-    for repo, catlist in workingdata.items():
-        temphash = {}
-        for item in catlist:
-            for datacat, rsid in item.items():
-                if datacat in temphash.keys():
-                    temphash[datacat].append(rsid)
-                else:
-                    temphash[datacat] = [rsid]
-            finaldata[repo] = temphash
+        if result['repo'] not in finaldata.keys():
+            finaldata[result['repo']] = [{result['datacat'] : result['idcount']}]
+        else:
+            finaldata[result['repo']].append({result['datacat'] : result['idcount']})
     return finaldata
 
 def plotlyBarChart(graphdata):
@@ -84,11 +81,11 @@ def plotlyBarChart(graphdata):
     for repo, dataarray in graphdata.items():
         catlist = []
         countlist = []
-        for datacat, rsid in dataarray.items():
-            catlist.append(datacat)
-            countlist.append(len(rsid))
+        for entry in dataarray:
+            for datacat,rsid in entry.items():
+                catlist.append(datacat)
+                countlist.append(rsid)
         data.append({'x': catlist, 'y': countlist, 'type': 'bar', 'name': repo})
-    pprint.pprint(data)
     fig = {
         'data' : data, 'layout' : {'title': 'Case Counts by Repository'}
     }
@@ -162,8 +159,11 @@ def updateGraph(n_clicks, datacatchecklist):
     if datacatchecklist is not None:
         pprint.pprint(datacatchecklist)
         query = buildDataCategoryQuery(datacatchecklist)
+        pprint.pprint(query)
         result = runAPIQuery(query, 1000)
+        pprint.pprint(result)
         graphdata = nodeParsedQuery(result)
+        pprint.pprint(graphdata)
         fig = plotlyBarChart(graphdata)
         return dcc.Graph(id='barchart', figure = fig)
 
