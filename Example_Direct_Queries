@@ -15,3 +15,7 @@ SELECT COUNT(DISTINCT _ResearchSubject.id) as RID,  _File.data_category as FDC, 
 
 #Using ARRAY_AGG to nest some relsults.  Can do 2 levels, but not 3
 "SELECT _ResearchSubject.id as rsid, ARRAY_AGG(_Specimen.id) AS spec_id, ARRAY_AGG(_File.drs_uri) AS drs_uri FROM gdc-bq-sample.cda_mvp.v3, UNNEST(ResearchSubject) AS _ResearchSubject, UNNEST(_ResearchSubject.Specimen) AS _Specimen, UNNEST(_Specimen.File) AS _File GROUP BY _ResearchSubject.id"
+
+#Oct 29, 2021  New query to try and capture Images in counts
+SELECT COUNT(DISTINCT all_v2.id) AS spec_count, _FILE.data_category FROM gdc-bq-sample.integration.all_v2 AS all_v2, 
+         UNNEST(File) AS _File  WHERE _File.associated_project= 'TCGA-OV' GROUP BY _File.data_category
